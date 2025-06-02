@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://yardimrehberi.com/sitemap.xml 

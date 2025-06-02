@@ -57,13 +57,16 @@ function generateSeoSlug(str: string) {
     'İ': 'i',
     'ö': 'o', 'Ö': 'o',
     'ş': 's', 'Ş': 's',
-    'ü': 'u', 'Ü': 'u'
+    'ü': 'u', 'Ü': 'u',
+    'é': 'e', 'â': 'a', 'î': 'i', 'û': 'u', 'ô': 'o',
+    '&': '', '@': '', '#': '', '$': '', '%': '', '^': '', '*': '', '(': '', ')': '', '=': '', '?': '', '!': '', ',': '', '.': '', ':': '', ';': '', '"': '', '\'': '', '[': '', ']': '', '{': '', '}': '', '|': '', '<': '', '>': '', '/': '', '\\': '', '`': '', '~': '', '+': '', '–': '-', '—': '-', '’': '', '“': '', '”': '', '…': '', ' ': '-', '_': '-',
   };
   return (
     str
-      .replace(/[çÇğĞıİöÖşŞüÜ]/g, (match) => trMap[match])
+      .replace(/[çÇğĞıİöÖşŞüÜéâîûô&@#$%^*()=?!,.:;"'\[\]{}|<>/\\`~+–—’"”… _]/g, (match) => trMap[match] || '-')
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/[^a-z0-9-]+/g, '')
+      .replace(/--+/g, '-')
       .replace(/(^-|-$)/g, '')
   );
 }
@@ -73,9 +76,9 @@ function addRandomToSlug(slug: string) {
 }
 
 function toTitleCase(str: string) {
-  return str.replace(/\w\S*/g, (txt) =>
-    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
-  );
+  return str
+    .toLowerCase()
+    .replace(/(^|\s|[-/])([a-zçğıöşü])/g, (m, p1, p2) => p1 + p2.toUpperCase());
 }
 
 async function fetchOpenAIContent(prompt: string) {
@@ -137,57 +140,58 @@ export default function Dashboard() {
   const handleAIGenerate = async () => {
     setAiLoading(true);
     try {
-      // OpenAI'dan SEO uyumlu, gerçekçi rehberler al
-      const result = await fetchOpenAIContent(aiInput);
-      // Sonuç tek bir rehber ise, onu bir guide olarak ekle
-      setAiResults([
-        {
-          topic: aiInput,
-          topicDesc: aiInput + ' hakkında rehber',
-          guides: [
-            {
-              title: aiInput,
-              desc: result.overview,
-              overview: result.overview,
-              important_notes: result.important_notes,
-              steps: result.steps,
-              faq: result.faq
-            }
-          ]
+      // Her satırı başlık olarak al
+      const topics = aiInput.split('\n').map(t => t.trim()).filter(Boolean);
+      if (topics.length === 0) {
+        toast.error('Lütfen en az bir başlık girin.');
+        setAiLoading(false);
+        return;
+      }
+      const results: any[] = [];
+      for (const topic of topics) {
+        try {
+          const result = await fetchOpenAIContent(topic);
+          results.push({
+            topic,
+            topicDesc: topic + ' hakkında rehber',
+            guides: [
+              {
+                title: topic,
+                desc: result.overview,
+                overview: result.overview,
+                important_notes: result.important_notes,
+                steps: result.steps,
+                faq: result.faq
+              }
+            ]
+          });
+        } catch (e: any) {
+          results.push({ topic, error: e.message || 'OpenAI API hatası' });
         }
-      ]);
+      }
+      setAiResults(results);
     } catch (e: any) {
       toast.error('OpenAI API hatası: ' + (e.message || e.toString()));
     }
     setAiLoading(false);
   };
 
-  const handleAddTopicAndGuides = async (res: any, idx: number) => {
-    if (addedTopics.includes(idx)) return;
+  const handleAddAllTopicsAndGuides = async () => {
     if (!selectedCategoryId) {
       toast.error('Lütfen bir kategori seçin!');
       return;
     }
-    try {
-      // 1. Konu ekle (önce SEO slug, çakışırsa random ekle)
-      let topicSlug = generateSeoSlug(res.topic);
-      let topicData, topicError;
-      {
-        const result = await supabase
-          .from('topics')
-          .insert({
-            title: res.topic,
-            description: res.topicDesc,
-            slug: topicSlug,
-            category_id: selectedCategoryId,
-          })
-          .select('*')
-          .single();
-        topicData = result.data;
-        topicError = result.error;
-        if (topicError && topicError.code === '23505') { // unique violation
-          topicSlug = addRandomToSlug(topicSlug);
-          const retry = await supabase
+    setAiLoading(true);
+    let successCount = 0;
+    for (let idx = 0; idx < aiResults.length; idx++) {
+      const res = aiResults[idx];
+      if (addedTopics.includes(idx) || res.error) continue;
+      try {
+        // 1. Konu ekle (önce SEO slug, çakışırsa random ekle)
+        let topicSlug = generateSeoSlug(res.topic);
+        let topicData, topicError;
+        {
+          const result = await supabase
             .from('topics')
             .insert({
               title: res.topic,
@@ -197,69 +201,47 @@ export default function Dashboard() {
             })
             .select('*')
             .single();
-          topicData = retry.data;
-          topicError = retry.error;
-        }
-      }
-      if (topicError || !topicData) throw new Error('Konu eklenemedi');
-      // 2. Rehberleri ekle (önce SEO slug, çakışırsa random ekle)
-      for (const g of res.guides) {
-        let guideSlug = generateSeoSlug(g.title);
-        let guideError;
-        // Başlıkları title case yap
-        const guideTitle = toTitleCase(g.title);
-        // Kategori adı ve başlığın ilk kelimesiyle görsel arama anahtar kelimesi oluştur
-        const selectedCategory = categories.find((cat: any) => cat.id === selectedCategoryId);
-        const categoryName = selectedCategory ? selectedCategory.name.toLowerCase() : '';
-        const firstWord = g.title.split(' ')[0].toLowerCase();
-        const imageKeyword = `${categoryName},${firstWord}`;
-        const imageUrl = `https://source.unsplash.com/800x600/?${encodeURIComponent(imageKeyword)}`;
-        {
-          const result = await supabase
-            .from('guides')
-            .insert({
-              title: guideTitle,
-              overview: g.overview || g.desc,
-              topic_id: topicData.id,
-              slug: guideSlug,
-              status: 'published',
-              category_id: selectedCategoryId,
-              content: g.overview || g.desc || guideTitle,
-              author_id: 'fa4a2b04-df1a-4edb-8142-f6b89e1ffe50',
-              steps: g.steps ? JSON.stringify(g.steps) : null,
-              important_notes: g.important_notes || '',
-              faq: g.faq ? JSON.stringify(g.faq) : null,
-              image: imageUrl
-            });
-          guideError = result.error;
-          if (guideError && guideError.code === '23505') { // unique violation
-            guideSlug = addRandomToSlug(guideSlug);
+          topicData = result.data;
+          topicError = result.error;
+          if (topicError && topicError.code === '23505') { // unique violation
+            topicSlug = addRandomToSlug(topicSlug);
             const retry = await supabase
-              .from('guides')
+              .from('topics')
               .insert({
-                title: guideTitle,
-                overview: g.overview || g.desc,
-                topic_id: topicData.id,
-                slug: guideSlug,
-                status: 'published',
+                title: res.topic,
+                description: res.topicDesc,
+                slug: topicSlug,
                 category_id: selectedCategoryId,
-                content: g.overview || g.desc || guideTitle,
-                author_id: 'fa4a2b04-df1a-4edb-8142-f6b89e1ffe50',
-                steps: g.steps ? JSON.stringify(g.steps) : null,
-                important_notes: g.important_notes || '',
-                faq: g.faq ? JSON.stringify(g.faq) : null,
-                image: imageUrl
-              });
-            guideError = retry.error;
+              })
+              .select('*')
+              .single();
+            topicData = retry.data;
           }
         }
-        if (guideError) throw new Error('Rehber eklenemedi: ' + guideTitle);
+        // 2. Guide ekle
+        for (const g of res.guides) {
+          await supabase.from('guides').insert({
+            title: toTitleCase(g.title),
+            overview: g.overview,
+            content: g.overview, // veya daha detaylı içerik
+            meta_description: g.desc,
+            slug: addRandomToSlug(generateSeoSlug(g.title)),
+            topic_id: topicData.id,
+            category_id: selectedCategoryId,
+            important_notes: g.important_notes,
+            steps: g.steps,
+            faq: g.faq,
+            status: 'published',
+          });
+        }
+        successCount++;
+        setAddedTopics(prev => [...prev, idx]);
+      } catch (e) {
+        // Hata olursa devam et
       }
-      toast.success('Konu ve rehberler başarıyla eklendi!');
-      setAddedTopics(prev => [...prev, idx]);
-    } catch (err: any) {
-      toast.error(err.message || 'Bir hata oluştu');
     }
+    toast.success(`${successCount} rehber başarıyla eklendi!`);
+    setAiLoading(false);
   };
 
   if (loading) {
@@ -492,10 +474,9 @@ export default function Dashboard() {
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
-              <input
-                type="text"
-                className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Örn: Finans, Sağlık, Eğitim..."
+              <textarea
+                className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-y"
+                placeholder="Her satıra bir başlık yazın...\nÖrn:\nLGS ve YKS Sınav Kayıt İşlemleri\nÜniversite Tercihleri İçin 2025 Bölüm Puanları\n..."
                 value={aiInput}
                 onChange={e => setAiInput(e.target.value)}
               />
@@ -506,6 +487,15 @@ export default function Dashboard() {
               >
                 {aiLoading ? 'Oluşturuluyor...' : 'Önerileri Getir'}
               </button>
+              {aiResults.length > 1 && (
+                <button
+                  className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
+                  onClick={handleAddAllTopicsAndGuides}
+                  disabled={aiLoading || !selectedCategoryId}
+                >
+                  {aiLoading ? 'Ekleniyor...' : 'Tümünü Otomatik Ekle'}
+                </button>
+              )}
             </div>
             {aiResults.length > 0 && (
               <div className="space-y-8">
@@ -522,7 +512,7 @@ export default function Dashboard() {
                           </div>
                           <button
                             className="text-blue-600 hover:underline text-sm font-medium"
-                            onClick={() => handleAddTopicAndGuides(res, idx)}
+                            onClick={() => handleAddAllTopicsAndGuides()}
                             disabled={addedTopics.includes(idx)}
                           >
                             {addedTopics.includes(idx) ? 'Eklendi' : 'Ekle'}
@@ -532,7 +522,7 @@ export default function Dashboard() {
                     </div>
                     <button
                       className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
-                      onClick={() => handleAddTopicAndGuides(res, idx)}
+                      onClick={() => handleAddAllTopicsAndGuides()}
                       disabled={addedTopics.includes(idx)}
                     >
                       {addedTopics.includes(idx) ? 'Eklendi' : 'Konuyu ve Rehberleri Ekle'}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, FileText, FolderOpen, Users, Settings, LogOut, BookOpen, LayoutTemplate } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -14,8 +14,12 @@ const navigation = [
 ];
 
 export default function PanelLayout() {
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, checkAuth } = useAuthStore();
   const location = useLocation();
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   if (!user) {
     return <Navigate to="/panel/login" state={{ from: location }} replace />;

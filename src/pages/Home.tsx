@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useFrontendStore } from '../store/frontendStore';
 import { BookOpen, Search, ChevronRight, Eye, Star, Layers, FolderOpen, FileText, Flame, Users, MessageCircle, X } from 'lucide-react';
@@ -19,6 +19,7 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [filteredGuides, setFilteredGuides] = useState<any[]>([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchCategories();
@@ -117,8 +118,8 @@ export default function Home() {
             </Link>
             <Link to="/soru-sor" className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-semibold text-lg shadow-sm transition">
               <MessageCircle className="w-6 h-6" /> Soru Sor
-            </Link>
-          </div>
+              </Link>
+            </div>
           <div className="mt-2 text-sm text-gray-500 flex flex-col items-center">
             <span className="inline-block bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium mb-1">{categories.length}+ kategori, {guides.length}+ rehber, topluluk desteği!</span>
             <span className="text-xs text-gray-400">YardımRehberi ile bilgiye ulaşmak çok kolay.</span>
@@ -134,11 +135,11 @@ export default function Home() {
             <Link to="/kategoriler" className="text-blue-600 hover:text-blue-800 flex items-center font-medium transition-transform duration-200 hover:scale-105">
               Tüm Kategoriler <ChevronRight className="w-5 h-5 ml-1" />
             </Link>
-          </div>
+                            </div>
           <div className="h-1 w-16 bg-blue-100 rounded-full mb-8" />
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {categories.map((cat: any) => (
-              <Link
+                                  <Link 
                 key={cat.id}
                 to={`/kategori/${cat.slug}`}
                 className="group rounded-2xl p-8 bg-gray-50 shadow hover:shadow-lg transition-transform duration-200 hover:scale-105 flex flex-col items-center text-center border border-gray-100"
@@ -146,21 +147,30 @@ export default function Home() {
               >
                 <div className="flex items-center justify-center w-16 h-16 rounded-full mb-4 shadow bg-white">
                   <FolderOpen className="h-8 w-8 text-blue-600" />
-                </div>
+                          </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{cat.name}</h3>
                 <p className="text-gray-600 mb-4 text-base line-clamp-2">{cat.description}</p>
                 <div className="flex flex-wrap gap-2 justify-center mb-2">
                   {cat.topics?.slice(0, 3).map((topic: any) => (
-                    <Link key={topic.id} to={`/kategori/${cat.slug}/${topic.slug}`} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium hover:bg-blue-100 transition">
+                    <button
+                      key={topic.id}
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        navigate(`/kategori/${cat.slug}/${topic.slug}`);
+                      }}
+                      className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium hover:bg-blue-100 transition"
+                    >
                       {topic.title}
-                    </Link>
+                    </button>
                   ))}
                 </div>
                 <span className="mt-2 text-gray-500 font-medium flex items-center text-sm">{cat.topics?.length || 0} konu</span>
-              </Link>
-            ))}
-          </div>
-        </div>
+                      </Link>
+                    ))}
+                  </div>
+              </div>
       </section>
 
       {/* KONULAR */}
@@ -182,7 +192,7 @@ export default function Home() {
                 <p className="text-gray-600 text-sm mb-3 line-clamp-2">{topic.description}</p>
                 <div className="flex items-center text-xs text-blue-600 mb-2">
                   <FolderOpen className="w-4 h-4 mr-1" /> {cat.name}
-                </div>
+            </div>
                 <span className="inline-block bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-semibold mb-2">{topic.guides?.length || 0} rehber</span>
                 <span className="mt-auto text-blue-700 hover:text-blue-900 font-medium flex items-center transition">Konuyu İncele <ChevronRight className="w-4 h-4 ml-1" /></span>
               </Link>
@@ -199,11 +209,11 @@ export default function Home() {
             <Link to="/rehberler" className="text-blue-600 hover:text-blue-800 flex items-center font-medium transition-transform duration-200 hover:scale-105">
               Tüm Rehberler <ChevronRight className="w-5 h-5 ml-1" />
             </Link>
-          </div>
+                          </div>
           <div className="h-1 w-10 bg-blue-100 rounded-full mb-8" />
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {newGuides.map((guide: any) => (
-              <Link
+                                <Link 
                 key={guide.id}
                 to={`/rehber/${guide.slug}`}
                 className="group bg-gray-50 rounded-2xl shadow hover:shadow-lg transition-transform duration-200 hover:scale-105 flex flex-col overflow-hidden border border-gray-100"
@@ -224,10 +234,10 @@ export default function Home() {
                     <span className="flex items-center"><Star className="inline h-4 w-4 mr-1 text-yellow-400" />{guide.rating}</span>
                   </div>
                 </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+                      </Link>
+                    ))}
+                  </div>
+              </div>
       </section>
 
       {/* EN POPÜLER REHBERLER */}
@@ -258,8 +268,8 @@ export default function Home() {
                   <div className="flex items-center justify-between text-xs text-yellow-700 mt-auto">
                     <span className="flex items-center"><Eye className="inline h-4 w-4 mr-1" />{guide.views}</span>
                     <span className="flex items-center"><Star className="inline h-4 w-4 mr-1 text-yellow-400" />{guide.rating}</span>
-                  </div>
-                </div>
+          </div>
+        </div>
               </Link>
             ))}
           </div>
@@ -293,7 +303,7 @@ export default function Home() {
               {search && filteredGuides.length > 0 ? (
                 <div className="space-y-3">
                   {filteredGuides.map((guide) => (
-                    <Link
+          <Link
                       key={guide.id}
                       to={`/rehber/${guide.slug}`}
                       onClick={() => setIsSearchModalOpen(false)}
@@ -302,7 +312,7 @@ export default function Home() {
                       <div className="flex items-center gap-4">
                         <img
                           src={guide.image || 'https://via.placeholder.com/80x80?text=Rehber'}
-                          alt={guide.title}
+                  alt={guide.title} 
                           className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                         />
                         <div className="flex-1 text-left">
@@ -312,12 +322,12 @@ export default function Home() {
                             <span>{guide.category?.name}</span>
                             <span>·</span>
                             <span>{guide.views} görüntüleme</span>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                  </div>
                 </div>
+              </div>
+                    </Link>
+          ))}
+        </div>
               ) : search ? (
                 <div className="text-center text-gray-500 py-10">Aradığınız kelimeyle eşleşen bir rehber bulunamadı.</div>
               ) : (

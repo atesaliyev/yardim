@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import * as LucideIcons from 'lucide-react';
 import { useFrontendStore } from '../store/frontendStore';
 
@@ -18,10 +18,42 @@ export default function Header() {
   const [expandedMobileMenus, setExpandedMobileMenus] = useState<string[]>([]);
   const { categories, guides, fetchCategories } = useFrontendStore();
   const [closeTimeout, setCloseTimeout] = useState<NodeJS.Timeout | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  // Menü açıkken body scroll'u engelle
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    return () => document.body.classList.remove('overflow-hidden');
+  }, [isMenuOpen]);
+
+  // Menüde bir linke tıklanınca menüyü kapat
+  const handleMenuLinkClick = () => {
+    setIsMenuOpen(false);
+    setExpandedMobileMenus([]);
+    setShowKurumsalDropdown(false);
+  };
+
+  // Menü açıldığında kategoriler yoksa tekrar fetch et
+  useEffect(() => {
+    if (isMenuOpen && categories.length === 0) {
+      fetchCategories();
+    }
+  }, [isMenuOpen, categories, fetchCategories]);
+
+  // Sayfa değişince menüyü kapat (örn. mobilde bir linke tıklanınca)
+  useEffect(() => {
+    setIsMenuOpen(false);
+    setExpandedMobileMenus([]);
+    setShowKurumsalDropdown(false);
+  }, [location.pathname]);
 
   // Rastgele 3 kategori seç
   const randomCategories = React.useMemo(() => {
@@ -57,8 +89,8 @@ export default function Header() {
 
   return (
     <header className={`fixed w-full z-50 transition-all duration-300 shadow-md bg-white/90 backdrop-blur-lg ${scrolled ? 'py-2' : 'py-4'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+        <div className="flex items-center justify-between h-16 md:h-20">
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2">
               <LucideIcons.BookOpen className="h-8 w-8 text-blue-600" />
@@ -84,7 +116,7 @@ export default function Header() {
                     onMouseEnter={() => handleMegaMenuEnter(cat.slug)}
                     onMouseLeave={handleMegaMenuLeave}
                   >
-                    <div className="w-[600px] bg-white shadow-xl rounded-2xl p-6 grid grid-cols-2 gap-8 border border-blue-100">
+                    <div className="w-[90vw] max-w-[600px] bg-white shadow-xl rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-2 gap-8 border border-blue-100">
                       {/* Rastgele 2 konu veya rehber göster */}
                       {cat.topics && cat.topics.length > 0 ? (
                         cat.topics
@@ -145,6 +177,7 @@ export default function Header() {
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-blue-600 p-2 rounded-lg hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              aria-label={isMenuOpen ? 'Menüyü Kapat' : 'Menüyü Aç'}
             >
               {isMenuOpen ? (
                 <LucideIcons.X className="h-7 w-7" />
@@ -157,49 +190,67 @@ export default function Header() {
       </div>
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-white/95 backdrop-blur-lg lg:hidden pt-24">
-          <div className="p-6">
+        <div className="fixed inset-0 z-40 bg-white/95 backdrop-blur-lg lg:hidden flex flex-col">
+          {/* Üstte logo ve kapatma butonu */}
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 bg-white/90">
+            <Link to="/" className="flex items-center gap-2" onClick={handleMenuLinkClick}>
+              <LucideIcons.BookOpen className="h-8 w-8 text-blue-600" />
+              <span className="ml-1 text-2xl font-extrabold text-gray-900 tracking-tight">YardımRehberi</span>
+            </Link>
+            <button
+              onClick={() => setIsMenuOpen(false)}
+              className="text-blue-600 p-2 rounded-lg hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              aria-label="Menüyü Kapat"
+            >
+              <LucideIcons.X className="h-8 w-8" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
             <div className="flex flex-col space-y-6">
-              {randomCategories.map((cat: any) => (
-                <div key={cat.id} className="border-b border-gray-100 pb-4">
-                  <button
-                    onClick={() => toggleMobileMenu(cat.slug)}
-                    className="flex items-center justify-between w-full px-2 py-2 rounded-lg hover:bg-blue-50 text-lg font-semibold text-gray-900"
-                  >
-                    <span className="flex items-center">{getCategoryIcon(cat.icon)}{cat.name}</span>
-                    <LucideIcons.ChevronDown className={`h-5 w-5 text-gray-400 transform transition-transform ${expandedMobileMenus.includes(cat.slug) ? 'rotate-180' : ''}`} />
-                  </button>
-                  {expandedMobileMenus.includes(cat.slug) && (
-                    <div className="mt-4 space-y-4">
-                      {cat.topics && cat.topics.length > 0 ? (
-                        cat.topics
-                          .sort(() => 0.5 - Math.random())
-                          .slice(0, 2)
-                          .map((topic: any) => (
-                            <div key={topic.id} className="pl-4">
-                              <h4 className="font-medium text-blue-700 mb-2 flex items-center">
-                                <LucideIcons.FileText className="w-4 h-4 mr-1 text-blue-400" />
-                                <Link to={`/kategori/${cat.slug}/${topic.slug}`}>{topic.title}</Link>
-                              </h4>
-                              <ul className="space-y-2 pl-2">
-                                {(topic.guides || []).sort(() => 0.5 - Math.random()).slice(0, 2).map((guide: any) => (
-                                  <li key={guide.id}>
-                                    <Link to={`/rehber/${guide.slug}`} className="text-gray-600 hover:text-blue-700 block py-1 rounded hover:bg-blue-50">
-                                      <LucideIcons.BookOpen className="inline w-4 h-4 mr-1 text-blue-300" />
-                                      {guide.title}
-                                    </Link>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))
-                      ) : (
-                        <div className="text-gray-400">Bu kategoride konu yok.</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {randomCategories.length === 0 ? (
+                <div className="text-center text-gray-400 py-8">Kategoriler yükleniyor...</div>
+              ) : (
+                randomCategories.map((cat: any) => (
+                  <div key={cat.id} className="border-b border-gray-100 pb-4">
+                    <button
+                      onClick={() => toggleMobileMenu(cat.slug)}
+                      className="flex items-center justify-between w-full px-2 py-2 rounded-lg hover:bg-blue-50 text-lg font-semibold text-gray-900"
+                    >
+                      <span className="flex items-center">{getCategoryIcon(cat.icon)}{cat.name}</span>
+                      <LucideIcons.ChevronDown className={`h-5 w-5 text-gray-400 transform transition-transform ${expandedMobileMenus.includes(cat.slug) ? 'rotate-180' : ''}`} />
+                    </button>
+                    {expandedMobileMenus.includes(cat.slug) && (
+                      <div className="mt-4 space-y-4">
+                        {cat.topics && cat.topics.length > 0 ? (
+                          cat.topics
+                            .sort(() => 0.5 - Math.random())
+                            .slice(0, 2)
+                            .map((topic: any) => (
+                              <div key={topic.id} className="pl-4">
+                                <h4 className="font-medium text-blue-700 mb-2 flex items-center">
+                                  <LucideIcons.FileText className="w-4 h-4 mr-1 text-blue-400" />
+                                  <Link to={`/kategori/${cat.slug}/${topic.slug}`} onClick={handleMenuLinkClick}>{topic.title}</Link>
+                                </h4>
+                                <ul className="space-y-2 pl-2">
+                                  {(topic.guides || []).sort(() => 0.5 - Math.random()).slice(0, 2).map((guide: any) => (
+                                    <li key={guide.id}>
+                                      <Link to={`/rehber/${guide.slug}`} className="text-gray-600 hover:text-blue-700 block py-1 rounded hover:bg-blue-50" onClick={handleMenuLinkClick}>
+                                        <LucideIcons.BookOpen className="inline w-4 h-4 mr-1 text-blue-300" />
+                                        {guide.title}
+                                      </Link>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))
+                        ) : (
+                          <div className="text-gray-400">Bu kategoride konu yok.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
               <div className="border-b border-gray-100 pb-4">
                 <button
                   onClick={() => setShowKurumsalDropdown(!showKurumsalDropdown)}
@@ -215,6 +266,7 @@ export default function Header() {
                         key={idx}
                         to={item.href}
                         className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition"
+                        onClick={handleMenuLinkClick}
                       >
                         <span>{item.title}</span>
                       </Link>

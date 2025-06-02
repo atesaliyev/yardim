@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { useEffect } from 'react';
 
 interface AuthState {
   user: any | null;
@@ -62,3 +63,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   }
 }));
+
+// Supabase oturumunu store ile tam senkronize et
+if (typeof window !== 'undefined') {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      useAuthStore.setState({ user: session.user, session, error: null });
+    } else {
+      useAuthStore.setState({ user: null, session: null });
+    }
+  });
+}

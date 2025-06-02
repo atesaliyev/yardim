@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, FileText, FolderOpen, Users, Settings, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -12,8 +12,12 @@ const navigation = [
 ];
 
 export default function AdminLayout() {
-  const { user, loading, signOut } = useAuthStore();
+  const { user, loading, signOut, checkAuth } = useAuthStore();
   const location = useLocation();
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   if (loading) {
     return (
